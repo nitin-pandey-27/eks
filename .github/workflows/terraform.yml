@@ -1,0 +1,1324 @@
+name: "Terraform AWS Deployment"
+
+on:
+  workflow_dispatch:
+    inputs:
+
+      job_selection:
+        description: 'Select which job to run'
+        required: true
+        type: choice
+        options:
+          - sequential_directory_apply
+          - sequential_directory_destroy
+          - single_directory
+          - monitoring_directory_apply
+          - monitoring_directory_destroy
+
+        #default: 'matrix_directory'
+
+      terraform_action:
+        description: 'Select the Terraform action'
+        required: true
+        type: choice
+        options:
+          - apply
+          - destroy
+        #default: 'apply'  # Default action is `apply`
+        # ${{ github.event.inputs.terraform_action }}
+      
+      single_directory:
+        description: 'Select a single Terraform directory'
+        required: true
+        type: choice
+        options:
+          - 02-application-vpc/01-vpc
+          - 02-application-vpc/02-kms-eks-node-oidc
+          - 02-application-vpc/03-ebs-eks-managed
+          - 02-application-vpc/04-ebs-storageclass-pvc
+          - 02-application-vpc/05-ingress-controller
+          - 02-application-vpc/06-A-cognito-ui-login
+          - 02-application-vpc/06-B-cognito-users
+          - 02-application-vpc/07-A-eks-kerpenter
+          - 02-application-vpc/07-B-eks-kerpenter
+          - 02-application-vpc/08-argocd
+          - 02-application-vpc/09-argocd-route53
+          - 02-application-vpc/10-vpc-peering
+          - 02-application-vpc/11-route-tables-update
+          - 03-monitoring-vpc/01-vpc
+          - 03-monitoring-vpc/02-kms-eks-node-oidc
+          - 03-monitoring-vpc/03-ebs-eks-managed
+          - 03-monitoring-vpc/04-ebs-storageclass-pvc
+          - 03-monitoring-vpc/05-ingress-controller
+          - 03-monitoring-vpc/08-argocd
+          - 03-monitoring-vpc/09-argocd-route53
+        #default: './02-application-vpc/01-vpc'  # Default directory
+
+  push:
+    branches:
+      - demo
+  pull_request:
+
+## https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services
+permissions:
+      id-token: write # This is required for aws oidc connection
+      contents: read # This is required for actions/checkout
+      pull-requests: write # This is required for gh bot to comment PR
+
+env:
+  TF_LOG: INFO
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  AWS_ROLE: ${{ secrets.AWS_ROLE }}
+
+jobs:
+
+#####################################
+#####################################
+###### APPLY        JOBS ############
+  
+  vpc_job:
+    name: 'vpc_job'
+    #runs-on: windows-latest
+    runs-on: windows-latest
+    environment: demo
+    #needs: vpc_job 
+    if: ${{ github.event.inputs.job_selection == 'sequential_directory_apply' }}
+
+    # Use the Bash shell regardless whether the GitHub Actions runner is windows-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    # Checkout the repository to the GitHub Actions runner
+    - name: Git checkout
+      uses: actions/checkout@v4
+
+    # https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services
+    - name: Configure AWS credentials from AWS account
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE }}
+        aws-region: ${{ secrets.AWS_REGION }}
+        role-session-name: GitHub-OIDC-TERRAFORM
+    
+    # Install the latest version of Terraform CLI and configure the Terraform CLI configuration file with a Terraform Cloud user API token
+    # https://github.com/hashicorp/setup-terraform
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "1.9.5"
+  
+    - name: Initialize Terraform for matrix directory
+      working-directory: 02-application-vpc/01-vpc
+      run: terraform init
+
+    - name: Execute Terraform for matrix directory
+      working-directory: 02-application-vpc/01-vpc
+      run: terraform apply -auto-approve
+
+  eks_job:
+    name: 'eks_job'
+    runs-on: windows-latest
+    environment: demo
+    needs: vpc_job 
+    #needs: eks_job
+    if: ${{ github.event.inputs.job_selection == 'sequential_directory_apply' }}
+
+    # Use the Bash shell regardless whether the GitHub Actions runner is windows-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    # Checkout the repository to the GitHub Actions runner
+    - name: Git checkout
+      uses: actions/checkout@v4
+
+    # https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services
+    - name: Configure AWS credentials from AWS account
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE }}
+        aws-region: ${{ secrets.AWS_REGION }}
+        role-session-name: GitHub-OIDC-TERRAFORM
+    
+    # Install the latest version of Terraform CLI and configure the Terraform CLI configuration file with a Terraform Cloud user API token
+    # https://github.com/hashicorp/setup-terraform
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "1.9.5"
+  
+    - name: Initialize Terraform for matrix directory
+      working-directory: 02-application-vpc/02-kms-eks-node-oidc
+      run: terraform init
+
+    - name: Execute Terraform for matrix directory
+      working-directory: 02-application-vpc/02-kms-eks-node-oidc
+      run: terraform apply -auto-approve
+  
+  ebs_job:
+    name: 'ebs_job'
+    runs-on: windows-latest
+    environment: demo
+    #needs: ebs_job
+    needs: eks_job
+    if: ${{ github.event.inputs.job_selection == 'sequential_directory_apply' }}
+
+    # Use the Bash shell regardless whether the GitHub Actions runner is windows-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    # Checkout the repository to the GitHub Actions runner
+    - name: Git checkout
+      uses: actions/checkout@v4
+
+    # https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services
+    - name: Configure AWS credentials from AWS account
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE }}
+        aws-region: ${{ secrets.AWS_REGION }}
+        role-session-name: GitHub-OIDC-TERRAFORM
+    
+    # Install the latest version of Terraform CLI and configure the Terraform CLI configuration file with a Terraform Cloud user API token
+    # https://github.com/hashicorp/setup-terraform
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "1.9.5"
+  
+    - name: Initialize Terraform for matrix directory
+      working-directory: 02-application-vpc/03-ebs-eks-managed
+      run: terraform init
+
+    - name: Execute Terraform for matrix directory
+      working-directory: 02-application-vpc/03-ebs-eks-managed
+      run: terraform apply -auto-approve
+
+  ebs_class_job:
+    name: 'ebs_class_job'
+    runs-on: windows-latest
+    environment: demo
+    needs: ebs_job
+    #needs: ebs_class_job
+    if: ${{ github.event.inputs.job_selection == 'sequential_directory_apply' }}
+
+    # Use the Bash shell regardless whether the GitHub Actions runner is windows-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    # Checkout the repository to the GitHub Actions runner
+    - name: Git checkout
+      uses: actions/checkout@v4
+
+    # https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services
+    - name: Configure AWS credentials from AWS account
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE }}
+        aws-region: ${{ secrets.AWS_REGION }}
+        role-session-name: GitHub-OIDC-TERRAFORM
+    
+    # Install the latest version of Terraform CLI and configure the Terraform CLI configuration file with a Terraform Cloud user API token
+    # https://github.com/hashicorp/setup-terraform
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "1.9.5"
+  
+    - name: Initialize Terraform for matrix directory
+      working-directory: 02-application-vpc/04-ebs-storageclass-pvc
+      run: terraform init
+
+    - name: Execute Terraform for matrix directory
+      working-directory: 02-application-vpc/04-ebs-storageclass-pvc
+      run: terraform apply -auto-approve
+  
+  ingress_job:
+    name: 'ingress_job'
+    runs-on: windows-latest
+    environment: demo
+    #needs: ingress_job
+    needs: ebs_class_job
+    if: ${{ github.event.inputs.job_selection == 'sequential_directory_apply' }}
+
+    # Use the Bash shell regardless whether the GitHub Actions runner is windows-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    # Checkout the repository to the GitHub Actions runner
+    - name: Git checkout
+      uses: actions/checkout@v4
+
+    # https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services
+    - name: Configure AWS credentials from AWS account
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE }}
+        aws-region: ${{ secrets.AWS_REGION }}
+        role-session-name: GitHub-OIDC-TERRAFORM
+    
+    # Install the latest version of Terraform CLI and configure the Terraform CLI configuration file with a Terraform Cloud user API token
+    # https://github.com/hashicorp/setup-terraform
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "1.9.5"
+  
+    - name: Initialize Terraform for matrix directory
+      working-directory: 02-application-vpc/05-ingress-controller
+      run: terraform init
+
+    - name: Execute Terraform for matrix directory
+      working-directory: 02-application-vpc/05-ingress-controller
+      run: terraform apply -auto-approve
+
+  cognito_a_job:
+    name: 'cognito_a_job'
+    runs-on: windows-latest
+    environment: demo
+    needs: ingress_job
+    #needs: cognito_a_job
+    if: ${{ github.event.inputs.job_selection == 'sequential_directory_apply' }}
+
+    # Use the Bash shell regardless whether the GitHub Actions runner is windows-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    # Checkout the repository to the GitHub Actions runner
+    - name: Git checkout
+      uses: actions/checkout@v4
+
+    # https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services
+    - name: Configure AWS credentials from AWS account
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE }}
+        aws-region: ${{ secrets.AWS_REGION }}
+        role-session-name: GitHub-OIDC-TERRAFORM
+    
+    # Install the latest version of Terraform CLI and configure the Terraform CLI configuration file with a Terraform Cloud user API token
+    # https://github.com/hashicorp/setup-terraform
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "1.9.5"
+  
+    - name: Initialize Terraform for matrix directory
+      working-directory: 02-application-vpc/06-A-cognito-ui-login
+      run: terraform init
+
+    - name: Execute Terraform for matrix directory
+      working-directory: 02-application-vpc/06-A-cognito-ui-login
+      run: terraform apply -auto-approve
+
+  cognito_b_job:
+    name: 'cognito_b_job'
+    runs-on: windows-latest
+    environment: demo
+    #needs: cognito_b_job
+    needs: cognito_a_job
+    if: ${{ github.event.inputs.job_selection == 'sequential_directory_apply' }}
+
+    # Use the Bash shell regardless whether the GitHub Actions runner is windows-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    # Checkout the repository to the GitHub Actions runner
+    - name: Git checkout
+      uses: actions/checkout@v4
+
+    # https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services
+    - name: Configure AWS credentials from AWS account
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE }}
+        aws-region: ${{ secrets.AWS_REGION }}
+        role-session-name: GitHub-OIDC-TERRAFORM
+    
+    # Install the latest version of Terraform CLI and configure the Terraform CLI configuration file with a Terraform Cloud user API token
+    # https://github.com/hashicorp/setup-terraform
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "1.9.5"
+  
+    - name: Initialize Terraform for matrix directory
+      working-directory: 02-application-vpc/06-B-cognito-users
+      run: terraform init
+
+    - name: Execute Terraform for matrix directory
+      working-directory: 02-application-vpc/06-B-cognito-users
+      run: terraform apply -auto-approve
+
+  karpenter_a_job:
+    name: 'karpenter_a_job'
+    runs-on: windows-latest
+    environment: demo
+    needs: cognito_b_job
+    #needs: karpenter_a_job
+    if: ${{ github.event.inputs.job_selection == 'sequential_directory_apply' }}
+
+    # Use the Bash shell regardless whether the GitHub Actions runner is windows-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    # Checkout the repository to the GitHub Actions runner
+    - name: Git checkout
+      uses: actions/checkout@v4
+
+    # https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services
+    - name: Configure AWS credentials from AWS account
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE }}
+        aws-region: ${{ secrets.AWS_REGION }}
+        role-session-name: GitHub-OIDC-TERRAFORM
+    
+    # Install the latest version of Terraform CLI and configure the Terraform CLI configuration file with a Terraform Cloud user API token
+    # https://github.com/hashicorp/setup-terraform
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "1.9.5"
+  
+    - name: Initialize Terraform for matrix directory
+      working-directory: 02-application-vpc/07-A-eks-kerpenter
+      run: terraform init
+
+    - name: Execute Terraform for matrix directory
+      working-directory: 02-application-vpc/07-A-eks-kerpenter
+      run: terraform apply -auto-approve
+
+  karpenter_b_job:
+    name: 'karpenter_b_job'
+    runs-on: windows-latest
+    environment: demo
+    #needs: karpenter_b_job
+    needs: karpenter_a_job
+    if: ${{ github.event.inputs.job_selection == 'sequential_directory_apply' }}
+
+    # Use the Bash shell regardless whether the GitHub Actions runner is windows-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    # Checkout the repository to the GitHub Actions runner
+    - name: Git checkout
+      uses: actions/checkout@v4
+
+    # https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services
+    - name: Configure AWS credentials from AWS account
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE }}
+        aws-region: ${{ secrets.AWS_REGION }}
+        role-session-name: GitHub-OIDC-TERRAFORM
+    
+    # Install the latest version of Terraform CLI and configure the Terraform CLI configuration file with a Terraform Cloud user API token
+    # https://github.com/hashicorp/setup-terraform
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "1.9.5"
+  
+    - name: Initialize Terraform for matrix directory
+      working-directory: 02-application-vpc/07-B-eks-kerpenter
+      run: terraform init
+
+    - name: Execute Terraform for matrix directory
+      working-directory: 02-application-vpc/07-B-eks-kerpenter
+      run: terraform apply -auto-approve
+
+  argocd_a_job:
+    name: 'argocd_a_job'
+    runs-on: windows-latest
+    environment: demo
+    needs: karpenter_b_job
+    #needs: argocd_a_job
+    if: ${{ github.event.inputs.job_selection == 'sequential_directory_apply' }}
+
+    # Use the Bash shell regardless whether the GitHub Actions runner is windows-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    # Checkout the repository to the GitHub Actions runner
+    - name: Git checkout
+      uses: actions/checkout@v4
+
+    # https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services
+    - name: Configure AWS credentials from AWS account
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE }}
+        aws-region: ${{ secrets.AWS_REGION }}
+        role-session-name: GitHub-OIDC-TERRAFORM
+    
+    # Install the latest version of Terraform CLI and configure the Terraform CLI configuration file with a Terraform Cloud user API token
+    # https://github.com/hashicorp/setup-terraform
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "1.9.5"
+  
+    - name: Initialize Terraform for matrix directory
+      working-directory: 02-application-vpc/08-argocd
+      run: terraform init
+
+    - name: Execute Terraform for matrix directory
+      working-directory: 02-application-vpc/08-argocd
+      run: terraform apply -auto-approve
+
+  argocd_b_job:
+    name: 'argocd_b_job'
+    runs-on: windows-latest
+    environment: demo
+    #needs: argocd_b_job
+    needs: argocd_a_job
+    if: ${{ github.event.inputs.job_selection == 'sequential_directory_apply' }}
+
+    # Use the Bash shell regardless whether the GitHub Actions runner is windows-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    # Checkout the repository to the GitHub Actions runner
+    - name: Git checkout
+      uses: actions/checkout@v4
+
+    # https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services
+    - name: Configure AWS credentials from AWS account
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE }}
+        aws-region: ${{ secrets.AWS_REGION }}
+        role-session-name: GitHub-OIDC-TERRAFORM
+    
+    # Install the latest version of Terraform CLI and configure the Terraform CLI configuration file with a Terraform Cloud user API token
+    # https://github.com/hashicorp/setup-terraform
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "1.9.5"
+  
+    - name: Initialize Terraform for matrix directory
+      working-directory: 02-application-vpc/09-argocd-route53
+      run: terraform init
+
+    - name: Execute Terraform for matrix directory
+      working-directory: 02-application-vpc/09-argocd-route53
+      run: terraform apply -auto-approve
+
+  # Job 2:single_directory Directory Execution
+
+#####################################
+#####################################
+######SINGLE DIRECTORY JOBS ############
+
+  single_directory:
+    name: 'Terraform'
+    runs-on: windows-latest
+    environment: demo
+    if: ${{ github.event.inputs.job_selection == 'single_directory' }}
+
+    # Use the Bash shell regardless whether the GitHub Actions runner is windows-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    # Checkout the repository to the GitHub Actions runner
+    - name: Git checkout
+      uses: actions/checkout@v4
+
+    # https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services
+    - name: Configure AWS credentials from AWS account
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE }}
+        aws-region: ${{ secrets.AWS_REGION }}
+        role-session-name: GitHub-OIDC-TERRAFORM
+    
+    # Install the latest version of Terraform CLI and configure the Terraform CLI configuration file with a Terraform Cloud user API token
+    # https://github.com/hashicorp/setup-terraform
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        #terraform_version: "1.9.0"
+        terraform_version: "1.9.5"
+
+    - name: Initialize Terraform for single directory
+      working-directory: ${{ github.event.inputs.single_directory }}
+      run: terraform init
+
+    - name: Execute Terraform for single directory
+      working-directory: ${{ github.event.inputs.single_directory }}
+      run: terraform ${{ github.event.inputs.terraform_action }} -auto-approve    
+
+#####################################
+#####################################
+########### DESTROY JOBS ############
+
+  argocd_b_destroy:
+    name: 'argocd_b_destroy'
+    runs-on: windows-latest
+    environment: demo
+    #needs: argocd_b_job
+    #needs: argocd_b_destroy
+    if: ${{ github.event.inputs.job_selection == 'sequential_directory_destroy' }}
+
+    # Use the Bash shell regardless whether the GitHub Actions runner is windows-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    # Checkout the repository to the GitHub Actions runner
+    - name: Git checkout
+      uses: actions/checkout@v4
+
+    # https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services
+    - name: Configure AWS credentials from AWS account
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE }}
+        aws-region: ${{ secrets.AWS_REGION }}
+        role-session-name: GitHub-OIDC-TERRAFORM
+    
+    # Install the latest version of Terraform CLI and configure the Terraform CLI configuration file with a Terraform Cloud user API token
+    # https://github.com/hashicorp/setup-terraform
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "1.9.5"
+  
+    - name: Initialize Terraform for matrix directory
+      working-directory: 02-application-vpc/09-argocd-route53
+      run: terraform init
+
+    - name: Execute Terraform for matrix directory
+      working-directory: 02-application-vpc/09-argocd-route53
+      run: terraform destroy -auto-approve
+
+  argocd_a_destroy:
+    name: 'argocd_a_destroy'
+    runs-on: windows-latest
+    environment: demo
+    #needs: argocd_b_job
+    needs: argocd_b_destroy
+    if: ${{ github.event.inputs.job_selection == 'sequential_directory_destroy' }}
+
+    # Use the Bash shell regardless whether the GitHub Actions runner is windows-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    # Checkout the repository to the GitHub Actions runner
+    - name: Git checkout
+      uses: actions/checkout@v4
+
+    # https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services
+    - name: Configure AWS credentials from AWS account
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE }}
+        aws-region: ${{ secrets.AWS_REGION }}
+        role-session-name: GitHub-OIDC-TERRAFORM
+    
+    # Install the latest version of Terraform CLI and configure the Terraform CLI configuration file with a Terraform Cloud user API token
+    # https://github.com/hashicorp/setup-terraform
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "1.9.5"
+  
+    - name: Initialize Terraform for matrix directory
+      working-directory: 02-application-vpc/08-argocd
+      run: terraform init
+
+    - name: Execute Terraform for matrix directory
+      working-directory: 02-application-vpc/08-argocd
+      run: terraform destroy -auto-approve
+
+  karpenter_b_destroy:
+    name: 'karpenter_b_destroy'
+    runs-on: windows-latest
+    environment: demo
+    #needs: karpenter_b_destroy
+    needs: argocd_a_destroy
+    if: ${{ github.event.inputs.job_selection == 'sequential_directory_destroy' }}
+
+    # Use the Bash shell regardless whether the GitHub Actions runner is windows-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    # Checkout the repository to the GitHub Actions runner
+    - name: Git checkout
+      uses: actions/checkout@v4
+
+    # https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services
+    - name: Configure AWS credentials from AWS account
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE }}
+        aws-region: ${{ secrets.AWS_REGION }}
+        role-session-name: GitHub-OIDC-TERRAFORM
+    
+    # Install the latest version of Terraform CLI and configure the Terraform CLI configuration file with a Terraform Cloud user API token
+    # https://github.com/hashicorp/setup-terraform
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "1.9.5"
+  
+    - name: Initialize Terraform for matrix directory
+      working-directory: 02-application-vpc/07-B-eks-kerpenter
+      run: terraform init
+
+    - name: Execute Terraform for matrix directory
+      working-directory: 02-application-vpc/07-B-eks-kerpenter
+      run: terraform destroy -auto-approve
+
+  karpenter_a_destroy:
+    name: 'karpenter_a_destroy'
+    runs-on: windows-latest
+    environment: demo
+    needs: karpenter_b_destroy
+    #needs: karpenter_a_destroy
+    if: ${{ github.event.inputs.job_selection == 'sequential_directory_destroy' }}
+
+    # Use the Bash shell regardless whether the GitHub Actions runner is windows-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    # Checkout the repository to the GitHub Actions runner
+    - name: Git checkout
+      uses: actions/checkout@v4
+
+    # https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services
+    - name: Configure AWS credentials from AWS account
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE }}
+        aws-region: ${{ secrets.AWS_REGION }}
+        role-session-name: GitHub-OIDC-TERRAFORM
+    
+    # Install the latest version of Terraform CLI and configure the Terraform CLI configuration file with a Terraform Cloud user API token
+    # https://github.com/hashicorp/setup-terraform
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "1.9.5"
+  
+    - name: Initialize Terraform for matrix directory
+      working-directory: 02-application-vpc/07-A-eks-kerpenter
+      run: terraform init
+
+    - name: Execute Terraform for matrix directory
+      working-directory: 02-application-vpc/07-A-eks-kerpenter
+      run: terraform destroy -auto-approve
+
+  cognito_b_destroy:
+    name: 'cognito_b_destroy'
+    runs-on: windows-latest
+    environment: demo
+    needs: karpenter_a_destroy
+    #needs: cognito_b_destroy
+    if: ${{ github.event.inputs.job_selection == 'sequential_directory_destroy' }}
+
+    # Use the Bash shell regardless whether the GitHub Actions runner is windows-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    # Checkout the repository to the GitHub Actions runner
+    - name: Git checkout
+      uses: actions/checkout@v4
+
+    # https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services
+    - name: Configure AWS credentials from AWS account
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE }}
+        aws-region: ${{ secrets.AWS_REGION }}
+        role-session-name: GitHub-OIDC-TERRAFORM
+    
+    # Install the latest version of Terraform CLI and configure the Terraform CLI configuration file with a Terraform Cloud user API token
+    # https://github.com/hashicorp/setup-terraform
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "1.9.5"
+  
+    - name: Initialize Terraform for matrix directory
+      working-directory: 02-application-vpc/06-B-cognito-users
+      run: terraform init
+
+    - name: Execute Terraform for matrix directory
+      working-directory: 02-application-vpc/06-B-cognito-users
+      run: terraform destroy -auto-approve
+
+  cognito_a_destroy:
+    name: 'cognito_a_destroy'
+    runs-on: windows-latest
+    environment: demo
+    #needs: cognito_a_destroy
+    needs: cognito_b_destroy
+    if: ${{ github.event.inputs.job_selection == 'sequential_directory_destroy' }}
+
+    # Use the Bash shell regardless whether the GitHub Actions runner is windows-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    # Checkout the repository to the GitHub Actions runner
+    - name: Git checkout
+      uses: actions/checkout@v4
+
+    # https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services
+    - name: Configure AWS credentials from AWS account
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE }}
+        aws-region: ${{ secrets.AWS_REGION }}
+        role-session-name: GitHub-OIDC-TERRAFORM
+    
+    # Install the latest version of Terraform CLI and configure the Terraform CLI configuration file with a Terraform Cloud user API token
+    # https://github.com/hashicorp/setup-terraform
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "1.9.5"
+  
+    - name: Initialize Terraform for matrix directory
+      working-directory: 02-application-vpc/06-A-cognito-ui-login
+      run: terraform init
+
+    - name: Execute Terraform for matrix directory
+      working-directory: 02-application-vpc/06-A-cognito-ui-login
+      run: terraform destroy -auto-approve
+
+  ingress_destroy:
+    name: 'ingress_destroy'
+    runs-on: windows-latest
+    environment: demo
+    needs: cognito_a_destroy
+    #needs: ingress_destroy
+    if: ${{ github.event.inputs.job_selection == 'sequential_directory_destroy' }}
+
+    # Use the Bash shell regardless whether the GitHub Actions runner is windows-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    # Checkout the repository to the GitHub Actions runner
+    - name: Git checkout
+      uses: actions/checkout@v4
+
+    # https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services
+    - name: Configure AWS credentials from AWS account
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE }}
+        aws-region: ${{ secrets.AWS_REGION }}
+        role-session-name: GitHub-OIDC-TERRAFORM
+    
+    # Install the latest version of Terraform CLI and configure the Terraform CLI configuration file with a Terraform Cloud user API token
+    # https://github.com/hashicorp/setup-terraform
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "1.9.5"
+  
+    - name: Initialize Terraform for matrix directory
+      working-directory: 02-application-vpc/05-ingress-controller
+      run: terraform init
+
+    - name: Execute Terraform for matrix directory
+      working-directory: 02-application-vpc/05-ingress-controller
+      run: terraform destroy -auto-approve
+
+  
+  ebs_pvc_destroy:
+    name: 'ebs_pvc_destroy'
+    runs-on: windows-latest
+    environment: demo
+    #needs: ebs_pvc_destroy
+    needs: ingress_destroy
+    if: ${{ github.event.inputs.job_selection == 'sequential_directory_destroy' }}
+
+    # Use the Bash shell regardless whether the GitHub Actions runner is windows-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    # Checkout the repository to the GitHub Actions runner
+    - name: Git checkout
+      uses: actions/checkout@v4
+
+    # https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services
+    - name: Configure AWS credentials from AWS account
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE }}
+        aws-region: ${{ secrets.AWS_REGION }}
+        role-session-name: GitHub-OIDC-TERRAFORM
+    
+    # Install the latest version of Terraform CLI and configure the Terraform CLI configuration file with a Terraform Cloud user API token
+    # https://github.com/hashicorp/setup-terraform
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "1.9.5"
+  
+    - name: Initialize Terraform for matrix directory
+      working-directory: 02-application-vpc/04-ebs-storageclass-pvc
+      run: terraform init
+
+    - name: Execute Terraform for matrix directory
+      working-directory: 02-application-vpc/04-ebs-storageclass-pvc
+      run: terraform destroy -auto-approve
+
+  ebs_destroy:
+    name: 'ebs_destroy'
+    runs-on: windows-latest
+    environment: demo
+    #needs: ebs_destroy
+    needs: ebs_pvc_destroy
+    if: ${{ github.event.inputs.job_selection == 'sequential_directory_destroy' }}
+
+    # Use the Bash shell regardless whether the GitHub Actions runner is windows-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    # Checkout the repository to the GitHub Actions runner
+    - name: Git checkout
+      uses: actions/checkout@v4
+
+    # https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services
+    - name: Configure AWS credentials from AWS account
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE }}
+        aws-region: ${{ secrets.AWS_REGION }}
+        role-session-name: GitHub-OIDC-TERRAFORM
+    
+    # Install the latest version of Terraform CLI and configure the Terraform CLI configuration file with a Terraform Cloud user API token
+    # https://github.com/hashicorp/setup-terraform
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "1.9.5"
+  
+    - name: Initialize Terraform for matrix directory
+      working-directory: 02-application-vpc/03-ebs-eks-managed
+      run: terraform init
+
+    - name: Execute Terraform for matrix directory
+      working-directory: 02-application-vpc/03-ebs-eks-managed
+      run: terraform destroy -auto-approve
+
+  eks_destroy:
+    name: 'eks_destroy'
+    runs-on: windows-latest
+    environment: demo
+    needs: ebs_destroy
+    #needs: eks_destroy
+    if: ${{ github.event.inputs.job_selection == 'sequential_directory_destroy' }}
+
+    # Use the Bash shell regardless whether the GitHub Actions runner is windows-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    # Checkout the repository to the GitHub Actions runner
+    - name: Git checkout
+      uses: actions/checkout@v4
+
+    # https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services
+    - name: Configure AWS credentials from AWS account
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE }}
+        aws-region: ${{ secrets.AWS_REGION }}
+        role-session-name: GitHub-OIDC-TERRAFORM
+    
+    # Install the latest version of Terraform CLI and configure the Terraform CLI configuration file with a Terraform Cloud user API token
+    # https://github.com/hashicorp/setup-terraform
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "1.9.5"
+  
+    - name: Initialize Terraform for matrix directory
+      working-directory: 02-application-vpc/02-kms-eks-node-oidc
+      run: terraform init
+
+    - name: Execute Terraform for matrix directory
+      working-directory: 02-application-vpc/02-kms-eks-node-oidc
+      run: terraform destroy -auto-approve
+
+  vpc_destroy:
+    name: 'vpc_destroy'
+    runs-on: windows-latest
+    environment: demo
+    #needs: ebs_destroy
+    needs: eks_destroy
+    if: ${{ github.event.inputs.job_selection == 'sequential_directory_destroy' }}
+
+    # Use the Bash shell regardless whether the GitHub Actions runner is windows-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    # Checkout the repository to the GitHub Actions runner
+    - name: Git checkout
+      uses: actions/checkout@v4
+
+    # https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services
+    - name: Configure AWS credentials from AWS account
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE }}
+        aws-region: ${{ secrets.AWS_REGION }}
+        role-session-name: GitHub-OIDC-TERRAFORM
+    
+    # Install the latest version of Terraform CLI and configure the Terraform CLI configuration file with a Terraform Cloud user API token
+    # https://github.com/hashicorp/setup-terraform
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "1.9.5"
+  
+    - name: Initialize Terraform for matrix directory
+      working-directory: 02-application-vpc/01-vpc
+      run: terraform init
+
+    - name: Execute Terraform for matrix directory
+      working-directory: 02-application-vpc/01-vpc
+      run: terraform destroy -auto-approve
+
+
+
+#####################################
+#####################################
+###### APPLY  MONITORING JOBS #######
+ 
+  vpc_job_monitoring:
+    name: 'vpc_job'
+    #runs-on: windows-latest
+    runs-on: windows-latest
+    environment: demo
+    #needs: vpc_job 
+    if: ${{ github.event.inputs.job_selection == 'monitoring_directory_apply' }}
+
+    # Use the Bash shell regardless whether the GitHub Actions runner is windows-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    # Checkout the repository to the GitHub Actions runner
+    - name: Git checkout
+      uses: actions/checkout@v4
+
+    # https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services
+    - name: Configure AWS credentials from AWS account
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE }}
+        aws-region: ${{ secrets.AWS_REGION }}
+        role-session-name: GitHub-OIDC-TERRAFORM
+    
+    # Install the latest version of Terraform CLI and configure the Terraform CLI configuration file with a Terraform Cloud user API token
+    # https://github.com/hashicorp/setup-terraform
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "1.9.5"
+  
+    - name: Initialize Terraform for matrix directory
+      working-directory: 03-monitoring-vpc/01-vpc
+      run: terraform init
+
+    - name: Execute Terraform for matrix directory
+      working-directory: 03-monitoring-vpc/01-vpc
+      run: terraform ${{ github.event.inputs.terraform_action }} -auto-approve
+
+  eks_job_monitoring:
+    name: 'eks_job'
+    runs-on: windows-latest
+    environment: demo
+    needs: vpc_job_monitoring 
+    #needs: eks_job
+    if: ${{ github.event.inputs.job_selection == 'monitoring_directory_apply' }}
+
+    # Use the Bash shell regardless whether the GitHub Actions runner is windows-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    # Checkout the repository to the GitHub Actions runner
+    - name: Git checkout
+      uses: actions/checkout@v4
+
+    # https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services
+    - name: Configure AWS credentials from AWS account
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE }}
+        aws-region: ${{ secrets.AWS_REGION }}
+        role-session-name: GitHub-OIDC-TERRAFORM
+    
+    # Install the latest version of Terraform CLI and configure the Terraform CLI configuration file with a Terraform Cloud user API token
+    # https://github.com/hashicorp/setup-terraform
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "1.9.5"
+  
+    - name: Initialize Terraform for matrix directory
+      working-directory: 03-monitoring-vpc/02-kms-eks-node-oidc
+      run: terraform init
+
+    - name: Execute Terraform for matrix directory
+      working-directory: 03-monitoring-vpc/02-kms-eks-node-oidc
+      run: terraform ${{ github.event.inputs.terraform_action }} -auto-approve
+  
+  ebs_job_monitoring:
+    name: 'ebs_job'
+    runs-on: windows-latest
+    environment: demo
+    #needs: ebs_job
+    needs: eks_job_monitoring
+    if: ${{ github.event.inputs.job_selection == 'monitoring_directory_apply' }}
+
+    # Use the Bash shell regardless whether the GitHub Actions runner is windows-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    # Checkout the repository to the GitHub Actions runner
+    - name: Git checkout
+      uses: actions/checkout@v4
+
+    # https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services
+    - name: Configure AWS credentials from AWS account
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE }}
+        aws-region: ${{ secrets.AWS_REGION }}
+        role-session-name: GitHub-OIDC-TERRAFORM
+    
+    # Install the latest version of Terraform CLI and configure the Terraform CLI configuration file with a Terraform Cloud user API token
+    # https://github.com/hashicorp/setup-terraform
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "1.9.5"
+  
+    - name: Initialize Terraform for matrix directory
+      working-directory: 03-monitoring-vpc/03-ebs-eks-managed
+      run: terraform init
+
+    - name: Execute Terraform for matrix directory
+      working-directory: 03-monitoring-vpc/03-ebs-eks-managed
+      run: terraform ${{ github.event.inputs.terraform_action }} -auto-approve
+
+  ebs_class_job_monitoring:
+    name: 'ebs_class_job'
+    runs-on: windows-latest
+    environment: demo
+    needs: ebs_job_monitoring
+    #needs: ebs_class_job
+    if: ${{ github.event.inputs.job_selection == 'monitoring_directory_apply' }}
+
+    # Use the Bash shell regardless whether the GitHub Actions runner is windows-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    # Checkout the repository to the GitHub Actions runner
+    - name: Git checkout
+      uses: actions/checkout@v4
+
+    # https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services
+    - name: Configure AWS credentials from AWS account
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE }}
+        aws-region: ${{ secrets.AWS_REGION }}
+        role-session-name: GitHub-OIDC-TERRAFORM
+    
+    # Install the latest version of Terraform CLI and configure the Terraform CLI configuration file with a Terraform Cloud user API token
+    # https://github.com/hashicorp/setup-terraform
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "1.9.5"
+  
+    - name: Initialize Terraform for matrix directory
+      working-directory: 03-monitoring-vpc/04-ebs-storageclass-pvc
+      run: terraform init
+
+    - name: Execute Terraform for matrix directory
+      working-directory: 03-monitoring-vpc/04-ebs-storageclass-pvc
+      run: terraform ${{ github.event.inputs.terraform_action }} -auto-approve
+  
+  ingress_job_monitoring:
+    name: 'ingress_job'
+    runs-on: windows-latest
+    environment: demo
+    #needs: ingress_job
+    needs: ebs_class_job_monitoring
+    if: ${{ github.event.inputs.job_selection == 'monitoring_directory_apply' }}
+
+    # Use the Bash shell regardless whether the GitHub Actions runner is windows-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    # Checkout the repository to the GitHub Actions runner
+    - name: Git checkout
+      uses: actions/checkout@v4
+
+    # https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services
+    - name: Configure AWS credentials from AWS account
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE }}
+        aws-region: ${{ secrets.AWS_REGION }}
+        role-session-name: GitHub-OIDC-TERRAFORM
+    
+    # Install the latest version of Terraform CLI and configure the Terraform CLI configuration file with a Terraform Cloud user API token
+    # https://github.com/hashicorp/setup-terraform
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "1.9.5"
+  
+    - name: Initialize Terraform for matrix directory
+      working-directory: 03-monitoring-vpc/05-ingress-controller
+      run: terraform init
+
+    - name: Execute Terraform for matrix directory
+      working-directory: 03-monitoring-vpc/05-ingress-controller
+      run: terraform ${{ github.event.inputs.terraform_action }} -auto-approve
+
+
+  argocd_a_job_monitoring:
+    name: 'argocd_a_job'
+    runs-on: windows-latest
+    environment: demo
+    needs: ingress_job_monitoring
+    #needs: argocd_a_job
+    if: ${{ github.event.inputs.job_selection == 'monitoring_directory_apply' }}
+
+    # Use the Bash shell regardless whether the GitHub Actions runner is windows-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    # Checkout the repository to the GitHub Actions runner
+    - name: Git checkout
+      uses: actions/checkout@v4
+
+    # https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services
+    - name: Configure AWS credentials from AWS account
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE }}
+        aws-region: ${{ secrets.AWS_REGION }}
+        role-session-name: GitHub-OIDC-TERRAFORM
+    
+    # Install the latest version of Terraform CLI and configure the Terraform CLI configuration file with a Terraform Cloud user API token
+    # https://github.com/hashicorp/setup-terraform
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "1.9.5"
+  
+    - name: Initialize Terraform for matrix directory
+      working-directory: 03-monitoring-vpc/08-argocd
+      run: terraform init
+
+    - name: Execute Terraform for matrix directory
+      working-directory: 03-monitoring-vpc/08-argocd
+      run: terraform ${{ github.event.inputs.terraform_action }} -auto-approve
+
+  argocd_b_job_monitoring:
+    name: 'argocd_b_job'
+    runs-on: windows-latest
+    environment: demo
+    #needs: argocd_b_job
+    needs: argocd_a_job_monitoring
+    if: ${{ github.event.inputs.job_selection == 'monitoring_directory_apply' }}
+
+    # Use the Bash shell regardless whether the GitHub Actions runner is windows-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    # Checkout the repository to the GitHub Actions runner
+    - name: Git checkout
+      uses: actions/checkout@v4
+
+    # https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services
+    - name: Configure AWS credentials from AWS account
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE }}
+        aws-region: ${{ secrets.AWS_REGION }}
+        role-session-name: GitHub-OIDC-TERRAFORM
+    
+    # Install the latest version of Terraform CLI and configure the Terraform CLI configuration file with a Terraform Cloud user API token
+    # https://github.com/hashicorp/setup-terraform
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "1.9.5"
+  
+    - name: Initialize Terraform for matrix directory
+      working-directory: 03-monitoring-vpc/09-argocd-route53
+      run: terraform init
+
+    - name: Execute Terraform for matrix directory
+      working-directory: 03-monitoring-vpc/09-argocd-route53
+      run: terraform ${{ github.event.inputs.terraform_action }} -auto-approve

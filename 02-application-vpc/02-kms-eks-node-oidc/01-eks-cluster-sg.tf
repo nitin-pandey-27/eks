@@ -1,0 +1,1 @@
+#We will use default values in SG automatically created by EKS cluster

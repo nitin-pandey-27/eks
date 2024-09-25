@@ -1,0 +1,122 @@
+# https://aws.amazon.com/blogs/containers/building-amazon-linux-2-cis-benchmark-amis-for-amazon-eks/
+# https://github.com/awslabs/amazon-eks-ami/tree/master
+# https://developer.hashicorp.com/packer/integrations/hashicorp/amazon#specifying-amazon-credentials
+
+0. Create ROLE for EC2 instance about managing AMIs 
+1. Create an EC2 instance in public subnet of ec2 instance with ami management role 
+2. Install git tool / packer / make file 
+3. Setup AWS Credentials either MANUALLY or Via SCRIPT.
+4. Execute COMMAND to create hardened AMI
+
+
+  532  yum install git
+  533  clear
+  534  git clone https://github.com/awslabs/amazon-eks-ami.git
+  535  cd amazon-eks-ami/
+  536  ls -lrth
+  537  packer
+  538  clear
+  539   yum install -y yum-utils
+  540  clear
+  541  yum-config-manager --add-repo https://rpm.releases.hashicorp.com/AmazonLinux/hashicorp.repo
+  542  yum -y install packer
+  543  packer version
+  544  clear
+  545  ls -lrth
+  546  vi eks-worker-al2-variables.json 
+  547  vi eks-worker-al2.json 
+  548  grep -ilr vpc_id *
+  549  clear
+  550  vi eks-worker-al2-variables.json
+  551  sed -i -e 's#/tmp#/home/ec2-user#g' eks-worker-al2.json
+  552  vi eks-worker-al2.json 
+  553  cat  eks-worker-al2.json 
+  554  cat  eks-worker-al2.json | grep tmp
+  555  clear
+  556  ls -lrth
+  557  vi scripts/install-worker.sh 
+  558  clear
+  559  cat scripts/install-worker.sh | grep -i tmp
+  560  sed -i -e 's#/tmp#/home/ec2-user#g' scripts/install-worker.sh
+  561  sed -i -e 's#mktemp -d#mktemp -d --tmpdir=/home/ec2-user/#g' scripts/install-worker.sh
+  562  vi scripts/install-worker.sh 
+  563  clear
+  564  sed -i -e 's#sudo chmod +x $binary#sudo chmod 755 $binary#g' scripts/install-worker.sh
+  565  vi scripts/install-worker.sh 
+  566  clear
+  567  vi scripts/generate-version-info.sh
+  568  sed -i -e 's#aws --version#sudo /bin/aws --version#g' scripts/generate-version-info.sh
+  569  vi scripts/cleanup.sh
+  570  sed -i -e 's#sudo rm -rf /tmp/worker#sudo rm -rf /home/ec2-user/worker#g' scripts/cleanup.sh
+  571  cat scripts/cleanup.sh 
+  572  clear
+  573  vi eks-worker-al2.json
+  574  clear
+  575  ls -lrth
+  576  vi eks-worker-al2.json 
+  577  vi eks-worker-al2-variables.json 
+  578  clear
+  579  export AWS_ACCESS_KEY_ID=""
+  580  export AWS_SECRET_ACCESS_KEY=""
+  581  export AWS_SESSION_TOKEN=""
+  582  make 1.26 aws_region=sa-east-1 source_ami_id=ami-05dc908211c15c11d source_ami_owners=137112412989 source_ami_filter_name=al2023-ami-2023.2.20231113.0-kernel-6.1-x86_64 subnet_id=subnet-0610e8c06b5950b4a ami_regions=sa-east-1 binary_bucket_region=sa-east-1 encrypted=true 
+  583  yum install make
+  584  clear
+  585  cat Makefile 
+  586  clear
+  587  make 1.26 aws_region=sa-east-1 source_ami_id=ami-05dc908211c15c11d source_ami_owners=137112412989 source_ami_filter_name=al2023-ami-2023.2.20231113.0-kernel-6.1-x86_64 subnet_id=subnet-0610e8c06b5950b4a ami_regions=sa-east-1 binary_bucket_region=sa-east-1 encrypted=true 
+  588  packer init .
+  589  ls -lrth
+  590  cd files/
+  591  ls -lrth
+  592  cd ..
+  593  ls -lrth
+  594  find . -name pkr *
+  595  grep -ilr pkr *
+  596  clear
+  597  ls -lrth
+  598  make aws_region=sa-east-1 source_ami_id=ami-05dc908211c15c11d source_ami_owners=137112412989 source_ami_filter_name=al2023-ami-2023.2.20231113.0-kernel-6.1-x86_64 subnet_id=subnet-0610e8c06b5950b4a ami_regions=sa-east-1 binary_bucket_region=sa-east-1 encrypted=true 
+  599  packer plugins install github.com/hashicorp/amazon
+  600  clear
+  601  make aws_region=sa-east-1 source_ami_id=ami-05dc908211c15c11d source_ami_owners=137112412989 source_ami_filter_name=al2023-ami-2023.2.20231113.0-kernel-6.1-x86_64 subnet_id=subnet-0610e8c06b5950b4a ami_regions=sa-east-1 binary_bucket_region=sa-east-1 encrypted=true 
+  602  pwd
+  603  cd ..
+  604  ls -lrth
+  605  rm -rf amazon-eks-ami/
+  606  ls -lrth
+  607  git clone https://github.com/awslabs/amazon-eks-ami.git
+  608  cd amazon-eks-ami/
+  609  clear
+  610  ls -lrth
+  611  vi eks-worker-al2-variables.json 
+  612  clear
+  613  make aws_region=sa-east-1 source_ami_id=ami-05dc908211c15c11d source_ami_owners=137112412989 source_ami_filter_name=al2023-ami-2023.2.20231113.0-kernel-6.1-x86_64 subnet_id=subnet-0610e8c06b5950b4a ami_regions=sa-east-1 binary_bucket_region=sa-east-1 encrypted=true 
+  614  ls -lrth
+  615  vi eks-worker-al2-variables.json 
+  616  clear
+  617  make aws_region=sa-east-1 source_ami_id=ami-05dc908211c15c11d source_ami_owners=137112412989 source_ami_filter_name=al2023-ami-2023.2.20231113.0-kernel-6.1-x86_64 subnet_id=subnet-0610e8c06b5950b4a ami_regions=sa-east-1 binary_bucket_region=sa-east-1 encrypted=true launch_block_device_mappings_volume_size=8
+  618  ls -lrth
+  619  cd log-collector-script/
+  620  ls -lrth
+  621  cd linux/
+  622  ls -lrth
+  623  cd ../..
+  624  ls -lrth
+  625  vi eks-worker-al2-variables.json 
+  626  grep -ilr  amazon-linux-extras *
+  627  vi scripts/install-worker.sh 
+  628  amazon-linux-extras
+  629  yum install amazon-linux-extras
+  630  ls -lrth
+  631  vi eks-worker-al2-variables.json 
+  632  clear
+  633  pwd
+  634  clear
+  635  make aws_region=sa-east-1 subnet_id=subnet-0610e8c06b5950b4a ami_regions=sa-east-1 binary_bucket_region=sa-east-1 encrypted=true launch_block_device_mappings_volume_size=8
+  636  ip a
+  637  clear
+  638  ls -lrth
+  639  cd amazon-eks-ami/
+  640  clear
+  641  ls -lrth
+  642  history

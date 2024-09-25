@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/component: server
+    app.kubernetes.io/instance: ${argocd_name}
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: ${argocd_name}
+  annotations:
+    #alb.ingress.kubernetes.io/backend-protocol-version: HTTP2
+    alb.ingress.kubernetes.io/healthcheck-path: /api/version
+    alb.ingress.kubernetes.io/healthcheck-port: "8080"
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTPS
+    meta.helm.sh/release-name: ${argocd_name}
+    meta.helm.sh/release-namespace: ${namespace}
+  name: ${service-name}
+  namespace: ${namespace}
+spec:
+  ports:
+  - name: https
+    port: 443
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app.kubernetes.io/instance: ${argocd_name}
+    app.kubernetes.io/name: ${argocd_name}
+  type: NodePort
+  
